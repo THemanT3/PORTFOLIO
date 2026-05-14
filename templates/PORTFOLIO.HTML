@@ -1,0 +1,1166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hemant Uppal — AI & Data Science Engineer</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;1,9..144,400&display=swap" rel="stylesheet">
+
+  <!-- MediaPipe & TF.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.0/dist/mobilenet.min.js"></script>
+
+  <style>
+    /* ── DESIGN TOKENS ─────────────────────────────────────────────── */
+    :root {
+      --bg:       #0a0a0f;
+      --surf:     #111118;
+      --surf2:    #1a1a24;
+      --border:   #2a2a3a;
+      --accent:   #00e5a0;
+      --accent2:  #7b61ff;
+      --accent3:  #ff6b35;
+      --text:     #e8e8f0;
+      --muted:    #6b6b88;
+      --glow:     rgba(0,229,160,0.12);
+    }
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+    html { scroll-behavior:smooth; }
+    body {
+      background:var(--bg);
+      color:var(--text);
+      font-family:'DM Mono',monospace;
+      overflow-x:hidden;
+      cursor:none;
+    }
+
+    /* ── NOISE OVERLAY ─────────────────────────────────────────────── */
+    body::before {
+      content:'';
+      position:fixed; inset:0;
+      background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events:none; z-index:1000; opacity:0.4;
+    }
+
+    /* ── CUSTOM CURSOR ─────────────────────────────────────────────── */
+    .cursor {
+      position:fixed; width:12px; height:12px;
+      background:var(--accent); border-radius:50%;
+      pointer-events:none; z-index:9999;
+      transition:transform 0.1s, opacity 0.2s;
+      mix-blend-mode:difference;
+    }
+    .cursor-ring {
+      position:fixed; width:36px; height:36px;
+      border:1px solid var(--accent); border-radius:50%;
+      pointer-events:none; z-index:9998;
+      transition:transform 0.18s ease, opacity 0.2s; opacity:0.5;
+    }
+
+    /* ── NAV ───────────────────────────────────────────────────────── */
+    nav {
+      position:fixed; top:0; left:0; right:0; z-index:500;
+      display:flex; align-items:center; justify-content:space-between;
+      padding:1.4rem 4rem;
+      border-bottom:1px solid transparent;
+      transition:all 0.4s; backdrop-filter:blur(0px);
+    }
+    nav.scrolled {
+      background:rgba(10,10,15,0.85);
+      border-color:var(--border);
+      backdrop-filter:blur(12px);
+    }
+    .nav-logo { font-family:'Syne',sans-serif; font-weight:800; font-size:1.1rem; letter-spacing:-0.02em; color:var(--accent); }
+    .nav-logo span { color:var(--text); }
+    .nav-links { display:flex; gap:2.5rem; }
+    .nav-links a {
+      font-size:0.72rem; letter-spacing:0.12em; text-transform:uppercase;
+      color:var(--muted); text-decoration:none; transition:color 0.2s; position:relative;
+    }
+    .nav-links a::after {
+      content:''; position:absolute; bottom:-4px; left:0;
+      width:0; height:1px; background:var(--accent); transition:width 0.3s;
+    }
+    .nav-links a:hover { color:var(--accent); }
+    .nav-links a:hover::after { width:100%; }
+
+    /* ── HERO ──────────────────────────────────────────────────────── */
+    #hero {
+      min-height:100vh; display:flex; align-items:center;
+      padding:8rem 4rem 4rem; position:relative; overflow:hidden;
+    }
+    .hero-grid-bg {
+      position:absolute; inset:0;
+      background-image:
+        linear-gradient(rgba(0,229,160,0.03) 1px,transparent 1px),
+        linear-gradient(90deg,rgba(0,229,160,0.03) 1px,transparent 1px);
+      background-size:60px 60px;
+      mask-image:radial-gradient(ellipse 80% 80% at 50% 50%,black,transparent);
+    }
+    .hero-blob { position:absolute; border-radius:50%; filter:blur(80px); pointer-events:none; }
+    .blob1 { width:600px;height:600px;background:rgba(0,229,160,0.07);top:-200px;right:-100px;animation:drift 12s ease-in-out infinite; }
+    .blob2 { width:400px;height:400px;background:rgba(123,97,255,0.06);bottom:0;left:-100px;animation:drift 16s ease-in-out infinite reverse; }
+    @keyframes drift { 0%,100%{transform:translate(0,0) scale(1);} 50%{transform:translate(30px,-40px) scale(1.05);} }
+    .hero-content { position:relative; z-index:2; max-width:900px; }
+    .hero-eyebrow {
+      display:inline-flex;align-items:center;gap:0.6rem;
+      font-size:0.7rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--accent);margin-bottom:1.5rem;
+    }
+    .hero-eyebrow::before { content:'';display:inline-block;width:32px;height:1px;background:var(--accent); }
+    .hero-name {
+      font-family:'Syne',sans-serif; font-weight:800;
+      font-size:clamp(3.5rem,8vw,7rem); line-height:0.92;
+      letter-spacing:-0.04em; margin-bottom:1rem;
+    }
+    .hero-name .line2 {
+      color:transparent; -webkit-text-stroke:1px rgba(255,255,255,0.25);
+      font-style:italic; font-family:'Fraunces',serif;
+    }
+    .hero-title {
+      font-size:0.85rem;letter-spacing:0.08em;color:var(--muted);
+      margin-bottom:2rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap;
+    }
+    .hero-title .sep { color:var(--border); }
+    .hero-title .highlight { color:var(--accent2); }
+    .hero-desc { font-size:0.9rem;font-weight:300;line-height:1.8;color:var(--muted);max-width:580px;margin-bottom:3rem; }
+    .hero-desc strong { color:var(--text);font-weight:400; }
+    .hero-cta { display:flex;gap:1rem;flex-wrap:wrap; }
+    .btn-primary {
+      display:inline-flex;align-items:center;gap:0.5rem;
+      padding:0.85rem 2rem;background:var(--accent);color:#000;
+      font-family:'Syne',sans-serif;font-weight:700;font-size:0.75rem;
+      letter-spacing:0.1em;text-transform:uppercase;text-decoration:none;
+      border:none;cursor:none;transition:all 0.2s;
+      clip-path:polygon(0 0,calc(100% - 10px) 0,100% 10px,100% 100%,10px 100%,0 calc(100% - 10px));
+    }
+    .btn-primary:hover { background:#fff;transform:translateY(-2px);box-shadow:0 8px 30px rgba(0,229,160,0.3); }
+    .btn-outline {
+      display:inline-flex;align-items:center;gap:0.5rem;
+      padding:0.85rem 2rem;border:1px solid var(--border);color:var(--muted);
+      font-family:'Syne',sans-serif;font-weight:600;font-size:0.75rem;
+      letter-spacing:0.1em;text-transform:uppercase;text-decoration:none;cursor:none;transition:all 0.2s;
+    }
+    .btn-outline:hover { border-color:var(--accent);color:var(--accent); }
+    .hero-stats { position:absolute;right:4rem;bottom:4rem;display:flex;gap:3rem; }
+    .stat { text-align:right; }
+    .stat-num { font-family:'Syne',sans-serif;font-weight:800;font-size:2.2rem;line-height:1;color:var(--accent); }
+    .stat-label { font-size:0.65rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-top:0.3rem; }
+
+    /* ── SECTION SHARED ────────────────────────────────────────────── */
+    section { padding:6rem 4rem; position:relative; }
+    .section-label {
+      display:flex;align-items:center;gap:1rem;
+      font-size:0.65rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--accent);margin-bottom:1.2rem;
+    }
+    .section-label::after { content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--border),transparent); }
+    .section-title { font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(2rem,4vw,3.5rem);line-height:1.05;letter-spacing:-0.03em;margin-bottom:1rem; }
+    .section-title em { font-style:italic;font-family:'Fraunces',serif;color:var(--accent2); }
+
+    /* ── ABOUT ─────────────────────────────────────────────────────── */
+    #about { background:var(--surf); }
+    .about-grid { display:grid;grid-template-columns:1fr 1fr;gap:4rem;align-items:start;margin-top:3rem; }
+    .about-text p { font-size:0.88rem;line-height:1.9;color:var(--muted);margin-bottom:1.2rem; }
+    .about-text p strong { color:var(--text); }
+    .edu-cards { display:flex;flex-direction:column;gap:1rem; }
+    .edu-card { border:1px solid var(--border);padding:1.5rem;position:relative;overflow:hidden;transition:border-color 0.3s; }
+    .edu-card::before { content:'';position:absolute;top:0;left:0;width:3px;height:100%;background:var(--accent); }
+    .edu-card:hover { border-color:var(--accent); }
+    .edu-deg { font-family:'Syne',sans-serif;font-weight:700;font-size:0.9rem;margin-bottom:0.3rem; }
+    .edu-inst { font-size:0.75rem;color:var(--accent);letter-spacing:0.05em; }
+    .edu-year { font-size:0.68rem;color:var(--muted);margin-top:0.4rem; }
+    .exp-card { border:1px solid var(--border);padding:1.5rem;margin-top:1rem;position:relative;overflow:hidden;transition:border-color 0.3s; }
+    .exp-card::before { content:'';position:absolute;top:0;left:0;width:3px;height:100%;background:var(--accent3); }
+    .exp-card:hover { border-color:var(--accent3); }
+    .exp-role { font-family:'Syne',sans-serif;font-weight:700;font-size:0.9rem;margin-bottom:0.3rem; }
+    .exp-company { font-size:0.75rem;color:var(--accent3); }
+    .exp-desc { font-size:0.78rem;color:var(--muted);margin-top:0.6rem;line-height:1.7; }
+
+    /* ── SKILLS ────────────────────────────────────────────────────── */
+    #skills { background:var(--bg); }
+    .skills-universe { margin-top:3rem;display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1.5rem; }
+    .skill-cluster {
+      border:1px solid var(--border);padding:1.5rem;transition:border-color 0.3s,transform 0.3s;position:relative;overflow:hidden;
+    }
+    .skill-cluster::after { content:'';position:absolute;inset:0;background:linear-gradient(135deg,var(--glow),transparent);opacity:0;transition:opacity 0.3s; }
+    .skill-cluster:hover { border-color:var(--accent);transform:translateY(-4px); }
+    .skill-cluster:hover::after { opacity:1; }
+    .cluster-icon { font-size:1.8rem;margin-bottom:0.8rem;display:block; }
+    .cluster-name { font-family:'Syne',sans-serif;font-weight:700;font-size:0.82rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--accent);margin-bottom:0.8rem; }
+    .skill-tags { display:flex;flex-wrap:wrap;gap:0.4rem; }
+    .tag { font-size:0.65rem;letter-spacing:0.06em;padding:0.25rem 0.6rem;background:var(--surf2);border:1px solid var(--border);color:var(--muted);transition:all 0.2s; }
+    .skill-cluster:hover .tag { border-color:rgba(0,229,160,0.2);color:var(--text); }
+
+    /* ── PROJECTS ──────────────────────────────────────────────────── */
+    #projects { background:var(--surf); }
+    .projects-grid { margin-top:3rem;display:grid;grid-template-columns:repeat(3,1fr);gap:1.5px; }
+    .project-card {
+      background:var(--surf2);padding:2rem;position:relative;overflow:hidden;
+      transition:background 0.3s;border:1px solid var(--border);
+    }
+    .project-card:hover { background:#1e1e2c; }
+    .project-card::before {
+      content:'';position:absolute;top:0;left:0;right:0;height:2px;
+      background:linear-gradient(90deg,var(--accent),var(--accent2));
+      transform:scaleX(0);transform-origin:left;transition:transform 0.4s;
+    }
+    .project-card:hover::before { transform:scaleX(1); }
+    .project-num { font-size:0.62rem;color:var(--border);letter-spacing:0.15em;margin-bottom:1rem;font-family:'Syne',sans-serif; }
+    .project-name { font-family:'Syne',sans-serif;font-weight:700;font-size:1rem;margin-bottom:0.6rem;line-height:1.3; }
+    .project-desc { font-size:0.75rem;color:var(--muted);line-height:1.7;margin-bottom:1.2rem; }
+    .project-tags { display:flex;flex-wrap:wrap;gap:0.35rem;margin-bottom:1.5rem; }
+    .project-tag { font-size:0.6rem;letter-spacing:0.08em;padding:0.2rem 0.5rem;background:rgba(0,229,160,0.06);border:1px solid rgba(0,229,160,0.15);color:var(--accent); }
+    .project-link { display:inline-flex;align-items:center;gap:0.4rem;font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);text-decoration:none;transition:color 0.2s; }
+    .project-link:hover { color:var(--accent); }
+    .project-link .arrow { transition:transform 0.2s; }
+    .project-link:hover .arrow { transform:translate(3px,-3px); }
+
+    /* ── AI PLAYGROUND ─────────────────────────────────────────────── */
+    #playground { background:var(--bg); }
+    .playground-intro { font-size:0.85rem;color:var(--muted);line-height:1.8;max-width:600px;margin-top:0.8rem; }
+    .playground-intro strong { color:var(--text); }
+
+    .playground-grid {
+      display:grid;grid-template-columns:1fr 1fr;gap:2rem;margin-top:3rem;
+    }
+
+    /* hand-tracking panel */
+    .demo-panel {
+      border:1px solid var(--border);padding:2rem;position:relative;overflow:hidden;
+      background:var(--surf2);transition:border-color 0.4s;
+    }
+    .demo-panel:hover { border-color:var(--accent); }
+    .demo-panel-header {
+      display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;
+    }
+    .demo-panel-title { font-family:'Syne',sans-serif;font-weight:700;font-size:0.85rem;letter-spacing:0.05em;color:var(--accent); }
+    .demo-badge {
+      font-size:0.6rem;letter-spacing:0.12em;text-transform:uppercase;
+      padding:0.2rem 0.6rem;border:1px solid;
+    }
+    .badge-mp { color:#00d4ff;border-color:rgba(0,212,255,0.3);background:rgba(0,212,255,0.06); }
+    .badge-tf { color:#ff7c43;border-color:rgba(255,124,67,0.3);background:rgba(255,124,67,0.06); }
+
+    /* Webcam canvas wrapper */
+    .webcam-wrapper {
+      position:relative;width:100%;aspect-ratio:4/3;
+      background:#0d0d14;border:1px solid var(--border);overflow:hidden;margin-bottom:1rem;
+    }
+    #handVideo { position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);opacity:0; }
+    #handCanvas { position:absolute;inset:0;width:100%;height:100%;transform:scaleX(-1); }
+    .cam-placeholder {
+      position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+      gap:0.8rem;font-size:0.7rem;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;
+    }
+    .cam-placeholder .cam-icon { font-size:2.5rem;opacity:0.3; }
+    .cam-placeholder.hidden { display:none; }
+
+    .gesture-display {
+      display:flex;align-items:center;justify-content:space-between;
+      padding:0.8rem 1rem;background:var(--surf);border:1px solid var(--border);margin-bottom:1rem;
+    }
+    .gesture-emoji { font-size:1.8rem;min-width:2.5rem;text-align:center;transition:all 0.2s; }
+    .gesture-info { flex:1;margin-left:0.8rem; }
+    .gesture-name { font-family:'Syne',sans-serif;font-weight:700;font-size:0.8rem;color:var(--text); }
+    .gesture-desc { font-size:0.65rem;color:var(--muted);margin-top:0.15rem; }
+    .hand-count {
+      font-family:'Syne',sans-serif;font-weight:800;font-size:1.4rem;color:var(--accent);
+      min-width:2rem;text-align:right;
+    }
+
+    .landmark-stats {
+      display:grid;grid-template-columns:repeat(5,1fr);gap:0.4rem;margin-bottom:1rem;
+    }
+    .finger-stat {
+      border:1px solid var(--border);padding:0.4rem 0.3rem;text-align:center;transition:all 0.2s;
+    }
+    .finger-stat.active { border-color:var(--accent);background:rgba(0,229,160,0.08); }
+    .finger-stat .f-label { font-size:0.55rem;color:var(--muted);letter-spacing:0.06em;text-transform:uppercase; }
+    .finger-stat .f-dot {
+      width:8px;height:8px;border-radius:50%;background:var(--border);margin:0.35rem auto 0;transition:background 0.2s;
+    }
+    .finger-stat.active .f-dot { background:var(--accent); }
+
+    .hand-btn {
+      width:100%;padding:0.75rem;font-family:'Syne',sans-serif;font-weight:700;font-size:0.72rem;
+      letter-spacing:0.1em;text-transform:uppercase;cursor:none;border:1px solid;
+      transition:all 0.2s;background:transparent;
+    }
+    .hand-btn.start { border-color:var(--accent);color:var(--accent); }
+    .hand-btn.start:hover { background:var(--accent);color:#000; }
+    .hand-btn.stop { border-color:var(--accent3);color:var(--accent3); }
+    .hand-btn.stop:hover { background:var(--accent3);color:#000; }
+
+    /* image classifier */
+    .drop-zone {
+      border:1.5px dashed var(--border);padding:2rem;text-align:center;
+      transition:all 0.3s;cursor:none;position:relative;margin-bottom:1rem;
+      min-height:180px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    }
+    .drop-zone:hover, .drop-zone.drag-over { border-color:var(--accent);background:rgba(0,229,160,0.04); }
+    .drop-zone .drop-icon { font-size:2.5rem;margin-bottom:0.6rem;opacity:0.4; }
+    .drop-zone .drop-label { font-size:0.72rem;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase; }
+    .drop-zone .drop-sub { font-size:0.6rem;color:var(--border);margin-top:0.3rem; }
+    #classifyInput { display:none; }
+    .preview-img { max-width:100%;max-height:160px;object-fit:contain;display:none;margin-bottom:0.5rem; }
+
+    .predictions-list { display:flex;flex-direction:column;gap:0.5rem; }
+    .pred-item { position:relative;overflow:hidden;padding:0.6rem 0.8rem;border:1px solid var(--border); }
+    .pred-bar {
+      position:absolute;top:0;left:0;bottom:0;
+      background:linear-gradient(90deg,rgba(0,229,160,0.1),rgba(123,97,255,0.05));
+      transition:width 0.6s ease;
+    }
+    .pred-content { position:relative;display:flex;justify-content:space-between;align-items:center; }
+    .pred-class { font-size:0.72rem;color:var(--text);text-transform:capitalize; }
+    .pred-conf { font-family:'Syne',sans-serif;font-weight:700;font-size:0.78rem;color:var(--accent); }
+    .pred-placeholder { font-size:0.72rem;color:var(--muted);text-align:center;padding:1rem; }
+
+    .tf-status {
+      display:flex;align-items:center;gap:0.5rem;font-size:0.62rem;
+      letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:1rem;
+    }
+    .tf-dot { width:7px;height:7px;border-radius:50%;background:var(--muted); }
+    .tf-dot.ready { background:var(--accent);animation:pulse 2s ease-in-out infinite; }
+    .tf-dot.loading { background:#ff7c43;animation:pulse 0.8s ease-in-out infinite; }
+
+    /* ── CONTACT ───────────────────────────────────────────────────── */
+    #contact { background:var(--surf); }
+    .contact-inner { margin-top:3rem;display:grid;grid-template-columns:1fr 1fr;gap:4rem;align-items:center; }
+    .contact-manifesto { font-family:'Fraunces',serif;font-size:1.8rem;line-height:1.4;font-weight:300; }
+    .contact-manifesto strong { font-weight:700;color:var(--accent); }
+    .contact-links { display:flex;flex-direction:column;gap:0.8rem; }
+    .contact-item {
+      display:flex;align-items:center;gap:1rem;padding:1rem 1.2rem;
+      border:1px solid var(--border);text-decoration:none;color:var(--muted);font-size:0.78rem;transition:all 0.2s;
+    }
+    .contact-item:hover { border-color:var(--accent);color:var(--accent);padding-left:1.6rem; }
+    .contact-label { font-size:0.6rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--accent);min-width:70px; }
+
+    /* ── FOOTER ────────────────────────────────────────────────────── */
+    footer { padding:2rem 4rem;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between; }
+    footer p { font-size:0.68rem;color:var(--muted);letter-spacing:0.05em; }
+    .status-dot { display:inline-flex;align-items:center;gap:0.5rem;font-size:0.68rem;color:var(--accent); }
+    .dot { width:7px;height:7px;border-radius:50%;background:var(--accent);animation:pulse 2s ease-in-out infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1);} 50%{opacity:0.4;transform:scale(0.7);} }
+
+    /* ── CHATBOT WIDGET ────────────────────────────────────────────── */
+    .chat-toggle {
+      position:fixed;bottom:2rem;right:2rem;z-index:800;
+      width:56px;height:56px;background:var(--accent);border-radius:50%;
+      display:flex;align-items:center;justify-content:center;
+      cursor:none;border:none;transition:all 0.3s;
+      box-shadow:0 4px 20px rgba(0,229,160,0.3);
+    }
+    .chat-toggle:hover { transform:scale(1.1);box-shadow:0 6px 28px rgba(0,229,160,0.45); }
+    .chat-toggle svg { width:24px;height:24px;transition:opacity 0.2s; }
+    .chat-toggle .icon-open { opacity:1; }
+    .chat-toggle .icon-close { opacity:0;position:absolute; }
+    .chat-toggle.open .icon-open { opacity:0; }
+    .chat-toggle.open .icon-close { opacity:1; }
+    .chat-badge {
+      position:absolute;top:-2px;right:-2px;width:14px;height:14px;
+      background:var(--accent3);border-radius:50%;border:2px solid var(--bg);
+      font-size:0;animation:pulse 2s ease-in-out infinite;
+    }
+
+    .chat-panel {
+      position:fixed;bottom:5.5rem;right:2rem;z-index:799;
+      width:380px;max-height:560px;
+      background:var(--surf);border:1px solid var(--border);
+      display:flex;flex-direction:column;
+      transform:translateY(20px) scale(0.95);opacity:0;
+      pointer-events:none;transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+      box-shadow:0 20px 60px rgba(0,0,0,0.6);
+    }
+    .chat-panel.open { transform:translateY(0) scale(1);opacity:1;pointer-events:all; }
+
+    .chat-header {
+      padding:1rem 1.2rem;border-bottom:1px solid var(--border);
+      display:flex;align-items:center;gap:0.75rem;
+    }
+    .chat-avatar {
+      width:32px;height:32px;border-radius:50%;
+      background:linear-gradient(135deg,var(--accent),var(--accent2));
+      display:flex;align-items:center;justify-content:center;
+      font-size:0.8rem;font-weight:700;color:#000;font-family:'Syne',sans-serif;
+      flex-shrink:0;
+    }
+    .chat-header-info { flex:1; }
+    .chat-header-name { font-family:'Syne',sans-serif;font-weight:700;font-size:0.78rem;color:var(--text); }
+    .chat-header-status { font-size:0.6rem;color:var(--accent);display:flex;align-items:center;gap:0.3rem; }
+    .chat-header-status::before { content:'';display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--accent); }
+    .chat-api-url {
+      padding:0.5rem 1rem;border-bottom:1px solid var(--border);
+      display:flex;align-items:center;gap:0.5rem;
+    }
+    .chat-api-label { font-size:0.58rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap; }
+    .chat-api-input {
+      flex:1;background:var(--surf2);border:1px solid var(--border);padding:0.25rem 0.5rem;
+      font-family:'DM Mono',monospace;font-size:0.62rem;color:var(--muted);outline:none;
+      transition:border-color 0.2s;
+    }
+    .chat-api-input:focus { border-color:var(--accent);color:var(--text); }
+
+    .chat-messages {
+      flex:1;overflow-y:auto;padding:1rem;display:flex;flex-direction:column;gap:0.8rem;
+      scroll-behavior:smooth;
+    }
+    .chat-messages::-webkit-scrollbar { width:4px; }
+    .chat-messages::-webkit-scrollbar-track { background:transparent; }
+    .chat-messages::-webkit-scrollbar-thumb { background:var(--border);border-radius:2px; }
+
+    .msg {
+      display:flex;flex-direction:column;max-width:85%;
+      animation:msgIn 0.2s ease;
+    }
+    @keyframes msgIn { from{opacity:0;transform:translateY(6px);} to{opacity:1;transform:translateY(0);} }
+    .msg.user { align-self:flex-end;align-items:flex-end; }
+    .msg.bot { align-self:flex-start;align-items:flex-start; }
+    .msg-bubble {
+      padding:0.6rem 0.9rem;font-size:0.75rem;line-height:1.6;
+      max-width:100%;word-break:break-word;
+    }
+    .msg.user .msg-bubble { background:var(--accent);color:#000;border-radius:0; }
+    .msg.bot .msg-bubble { background:var(--surf2);color:var(--text);border:1px solid var(--border);border-radius:0; }
+    .msg-time { font-size:0.55rem;color:var(--muted);margin-top:0.2rem;letter-spacing:0.05em; }
+
+    .typing-bubble {
+      display:flex;align-items:center;gap:4px;padding:0.7rem 0.9rem;
+      background:var(--surf2);border:1px solid var(--border);width:fit-content;
+    }
+    .typing-dot {
+      width:5px;height:5px;border-radius:50%;background:var(--muted);
+      animation:typingBounce 1.2s ease-in-out infinite;
+    }
+    .typing-dot:nth-child(2) { animation-delay:0.2s; }
+    .typing-dot:nth-child(3) { animation-delay:0.4s; }
+    @keyframes typingBounce { 0%,60%,100%{transform:translateY(0);} 30%{transform:translateY(-5px);background:var(--accent);} }
+
+    .chat-input-area {
+      padding:0.8rem;border-top:1px solid var(--border);display:flex;gap:0.5rem;
+    }
+    .chat-input {
+      flex:1;background:var(--surf2);border:1px solid var(--border);padding:0.6rem 0.8rem;
+      font-family:'DM Mono',monospace;font-size:0.75rem;color:var(--text);outline:none;
+      transition:border-color 0.2s;resize:none;
+    }
+    .chat-input:focus { border-color:var(--accent); }
+    .chat-send {
+      padding:0.6rem 1rem;background:var(--accent);color:#000;
+      font-family:'Syne',sans-serif;font-weight:700;font-size:0.7rem;
+      border:none;cursor:none;transition:all 0.2s;white-space:nowrap;
+    }
+    .chat-send:hover { background:#fff; }
+    .chat-send:disabled { opacity:0.4;pointer-events:none; }
+    .chat-error {
+      font-size:0.68rem;color:var(--accent3);padding:0.4rem 1rem;
+      border-top:1px solid rgba(255,107,53,0.2);background:rgba(255,107,53,0.04);
+      display:none;
+    }
+    .chat-error.visible { display:block; }
+
+    /* ── REVEAL ANIMATION ──────────────────────────────────────────── */
+    .reveal { opacity:0;transform:translateY(30px);transition:opacity 0.7s ease,transform 0.7s ease; }
+    .reveal.visible { opacity:1;transform:translateY(0); }
+
+    /* ── RESPONSIVE ────────────────────────────────────────────────── */
+    @media (max-width:1024px) {
+      .playground-grid { grid-template-columns:1fr; }
+    }
+    @media (max-width:900px) {
+      nav { padding:1.2rem 1.5rem; }
+      .nav-links { display:none; }
+      section { padding:4rem 1.5rem; }
+      #hero { padding:7rem 1.5rem 4rem; }
+      .about-grid,.contact-inner { grid-template-columns:1fr;gap:2rem; }
+      .projects-grid { grid-template-columns:1fr; }
+      .hero-stats { position:static;margin-top:3rem;justify-content:flex-start;gap:2rem; }
+      .chat-panel { width:calc(100vw - 2rem);right:1rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+
+  <!-- NAV ──────────────────────────────────────────────────────────── -->
+  <nav id="nav">
+    <div class="nav-logo"><span>HemantU</span>.dev</div>
+    <div class="nav-links">
+      <a href="#about">About</a>
+      <a href="#skills">Skills</a>
+      <a href="#projects">Projects</a>
+      <a href="#playground">AI Demos</a>
+      <a href="#contact">Contact</a>
+    </div>
+  </nav>
+
+  <!-- HERO ─────────────────────────────────────────────────────────── -->
+  <section id="hero">
+    <div class="hero-grid-bg"></div>
+    <div class="hero-blob blob1"></div>
+    <div class="hero-blob blob2"></div>
+    <div class="hero-content">
+      <div class="hero-eyebrow reveal">Available for Internships & Full-time Roles</div>
+      <h1 class="hero-name reveal" style="transition-delay:.1s">
+        <div>Hemant</div>
+        <div class="line2">Uppal</div>
+      </h1>
+      <div class="hero-title reveal" style="transition-delay:.2s">
+        <span class="highlight">AI & Backend Engineer</span>
+        <span class="sep">|</span>
+        <span>Data Scientist</span>
+        <span class="sep">|</span>
+        <span>ML Practitioner</span>
+      </div>
+      <p class="hero-desc reveal" style="transition-delay:.3s">
+        Building intelligent systems at the intersection of <strong>AI, data, and software</strong>.
+        Dual-degree student at <strong>Delhi University</strong> & <strong>IIT Madras</strong> with
+        hands-on experience shipping real-world ML and web applications.
+      </p>
+      <div class="hero-cta reveal" style="transition-delay:.4s">
+        <a href="#projects" class="btn-primary">View Projects →</a>
+        <a href="#playground" class="btn-outline">🤖 Live AI Demos</a>
+      </div>
+    </div>
+    <div class="hero-stats reveal" style="transition-delay:.5s">
+      <div class="stat"><div class="stat-num">6+</div><div class="stat-label">Projects Shipped</div></div>
+      <div class="stat"><div class="stat-num">2</div><div class="stat-label">Degrees Parallel</div></div>
+      <div class="stat"><div class="stat-num">30+</div><div class="stat-label">Technologies</div></div>
+    </div>
+  </section>
+
+  <!-- ABOUT ────────────────────────────────────────────────────────── -->
+  <section id="about">
+    <div class="section-label">01 — About</div>
+    <h2 class="section-title reveal">Where <em>mathematics</em><br>meets intelligence</h2>
+    <div class="about-grid">
+      <div class="about-text reveal">
+        <p>I'm a <strong>third-year undergraduate</strong> pursuing B.Sc. in Mathematics, Computer Science & Physics from <strong>Delhi University</strong>, simultaneously enrolled in B.S. in Data Science & Applications at <strong>IIT Madras</strong> — a rare combination that grounds my AI work in rigorous mathematical foundations.</p>
+        <p>Through self-learning and academics, I've built deep expertise in <strong>AI, Machine Learning, Data Analytics, and Full-Stack Backend Development</strong>. My work spans from training neural networks to deploying end-to-end web applications used in production.</p>
+        <p>At <strong>Guruji Traders (MSME)</strong>, I applied data analytics and business intelligence to drive real decisions — cleaning messy datasets, building dashboards, and translating numbers into strategy.</p>
+        <div class="exp-card">
+          <div class="exp-role">Data / Business Analyst</div>
+          <div class="exp-company">Guruji Traders — MSME</div>
+          <div class="exp-desc">Data collection, mining & analysis · BI dashboards · Data visualization · Workflow optimization · E-commerce data management</div>
+        </div>
+      </div>
+      <div class="reveal" style="transition-delay:.15s">
+        <div class="edu-cards">
+          <div class="edu-card">
+            <div class="edu-deg">B.Sc. Mathematics, Computer Science & Physics</div>
+            <div class="edu-inst">University of Delhi</div>
+            <div class="edu-year">3rd Year · 2024 – 2026</div>
+          </div>
+          <div class="edu-card">
+            <div class="edu-deg">B.S. Data Science & Applications</div>
+            <div class="edu-inst">IIT Madras — Online Degree Programme</div>
+            <div class="edu-year">Ongoing · 2024 – Present</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SKILLS ───────────────────────────────────────────────────────── -->
+  <section id="skills">
+    <div class="section-label">02 — Technical Arsenal</div>
+    <h2 class="section-title reveal">Built across the<br><em>full AI stack</em></h2>
+    <div class="skills-universe">
+      <div class="skill-cluster reveal"><span class="cluster-icon">🤖</span><div class="cluster-name">AI / ML Core</div><div class="skill-tags"><span class="tag">Machine Learning</span><span class="tag">Deep Learning</span><span class="tag">Supervised ML</span><span class="tag">Unsupervised ML</span><span class="tag">Scikit-learn</span><span class="tag">TensorFlow</span><span class="tag">PyTorch</span><span class="tag">OpenAI API</span></div></div>
+      <div class="skill-cluster reveal" style="transition-delay:.05s"><span class="cluster-icon">🧠</span><div class="cluster-name">LLMs & AI Agents</div><div class="skill-tags"><span class="tag">AI Agents</span><span class="tag">LLM Applications</span><span class="tag">Chatbots</span><span class="tag">Prompt Engineering</span><span class="tag">RAG Systems</span><span class="tag">OpenAI</span></div></div>
+      <div class="skill-cluster reveal" style="transition-delay:.1s"><span class="cluster-icon">📊</span><div class="cluster-name">Data Science</div><div class="skill-tags"><span class="tag">NumPy</span><span class="tag">Pandas</span><span class="tag">Data Cleaning</span><span class="tag">Preprocessing</span><span class="tag">Data Warehousing</span><span class="tag">EDA</span><span class="tag">Matplotlib</span></div></div>
+      <div class="skill-cluster reveal" style="transition-delay:.15s"><span class="cluster-icon">⚙️</span><div class="cluster-name">Backend & APIs</div><div class="skill-tags"><span class="tag">Python</span><span class="tag">Flask</span><span class="tag">FastAPI</span><span class="tag">REST APIs</span><span class="tag">C++</span><span class="tag">OOP</span><span class="tag">DSA</span></div></div>
+      <div class="skill-cluster reveal" style="transition-delay:.2s"><span class="cluster-icon">🗄️</span><div class="cluster-name">Databases</div><div class="skill-tags"><span class="tag">PostgreSQL</span><span class="tag">SQL</span><span class="tag">DBMS</span><span class="tag">Database Design</span><span class="tag">Data Warehousing</span></div></div>
+      <div class="skill-cluster reveal" style="transition-delay:.25s"><span class="cluster-icon">🌐</span><div class="cluster-name">Frontend</div><div class="skill-tags"><span class="tag">HTML</span><span class="tag">CSS</span><span class="tag">Vue.js</span><span class="tag">Responsive Design</span></div></div>
+      <div class="skill-cluster reveal" style="transition-delay:.3s"><span class="cluster-icon">🚀</span><div class="cluster-name">DevOps & Cloud</div><div class="skill-tags"><span class="tag">Docker</span><span class="tag">AWS Basics</span><span class="tag">Linux</span><span class="tag">Git/GitHub</span><span class="tag">Vercel</span><span class="tag">Render</span></div></div>
+      <div class="skill-cluster reveal" style="transition-delay:.35s"><span class="cluster-icon">🔢</span><div class="cluster-name">CS Fundamentals</div><div class="skill-tags"><span class="tag">Operating Systems</span><span class="tag">Computer Networks</span><span class="tag">DBMS</span><span class="tag">DSA</span><span class="tag">Statistics</span><span class="tag">Mathematics</span></div></div>
+    </div>
+  </section>
+
+  <!-- PROJECTS ─────────────────────────────────────────────────────── -->
+  <section id="projects">
+    <div class="section-label">03 — Projects</div>
+    <h2 class="section-title reveal">Things I've<br><em>actually built</em></h2>
+    <div class="projects-grid">
+      <div class="project-card reveal">
+        <div class="project-num">01</div>
+        <div class="project-name">Stock Market Prediction System</div>
+        <div class="project-desc">ML-driven system to forecast stock price movements using historical data, feature engineering, and multiple supervised learning algorithms. Built with Python, Pandas, and Scikit-learn pipelines.</div>
+        <div class="project-tags"><span class="project-tag">Python</span><span class="project-tag">ML</span><span class="project-tag">Pandas</span><span class="project-tag">Scikit-learn</span><span class="project-tag">Time Series</span></div>
+      </div>
+      <div class="project-card reveal" style="transition-delay:.05s">
+        <div class="project-num">02</div>
+        <div class="project-name">Nifty 50 Data Analysis</div>
+        <div class="project-desc">Comprehensive analysis of NIFTY 50 index data — data cleaning, exploratory analysis, sector-wise performance breakdowns, and visualizations to uncover market patterns and volatility insights.</div>
+        <div class="project-tags"><span class="project-tag">Python</span><span class="project-tag">Pandas</span><span class="project-tag">NumPy</span><span class="project-tag">Matplotlib</span><span class="project-tag">EDA</span></div>
+      </div>
+      <div class="project-card reveal" style="transition-delay:.1s">
+        <div class="project-num">03</div>
+        <div class="project-name">GovtInsight — Manifesto Tracker</div>
+        <div class="project-desc">Web app that tracks and visualizes government manifesto promises vs actual implementation. Allows citizens to explore data by party, region, and sector.</div>
+        <div class="project-tags"><span class="project-tag">Flask</span><span class="project-tag">Python</span><span class="project-tag">PostgreSQL</span><span class="project-tag">Data Viz</span></div>
+        <a href="https://govtinsight.onrender.com" target="_blank" class="project-link">Live Demo <span class="arrow">↗</span></a>
+      </div>
+      <div class="project-card reveal" style="transition-delay:.15s">
+        <div class="project-num">04</div>
+        <div class="project-name">Khaas — Household Services App</div>
+        <div class="project-desc">Full-stack A-to-Z household services marketplace connecting service providers with customers. Handles bookings, user auth, service listings, and admin management.</div>
+        <div class="project-tags"><span class="project-tag">Flask</span><span class="project-tag">Vue.js</span><span class="project-tag">SQL</span><span class="project-tag">REST API</span><span class="project-tag">Full-Stack</span></div>
+        <a href="https://khaas.onrender.com" target="_blank" class="project-link">Live Demo <span class="arrow">↗</span></a>
+      </div>
+      <div class="project-card reveal" style="transition-delay:.2s">
+        <div class="project-num">05</div>
+        <div class="project-name">Swasth Bharat — Healthcare App</div>
+        <div class="project-desc">Healthcare-focused web application providing health resources, appointment booking, and information services with a focus on accessibility and clean UX.</div>
+        <div class="project-tags"><span class="project-tag">HTML/CSS</span><span class="project-tag">Backend</span><span class="project-tag">Vercel</span><span class="project-tag">Healthcare</span></div>
+        <a href="https://swasthbharat1.vercel.app/" target="_blank" class="project-link">Live Demo <span class="arrow">↗</span></a>
+      </div>
+      <div class="project-card reveal" style="transition-delay:.25s">
+        <div class="project-num">06</div>
+        <div class="project-name">Guruji Tables — MSME E-Commerce</div>
+        <div class="project-desc">Production e-commerce platform built for a real MSME business. Includes product catalog, ordering system, and business data management. Currently serving live customers.</div>
+        <div class="project-tags"><span class="project-tag">E-Commerce</span><span class="project-tag">Vue.js</span><span class="project-tag">Vercel</span><span class="project-tag">Production</span></div>
+        <a href="https://gurujitables.vercel.app/" target="_blank" class="project-link">Live Demo <span class="arrow">↗</span></a>
+      </div>
+    </div>
+  </section>
+
+  <!-- AI PLAYGROUND ────────────────────────────────────────────────── -->
+  <section id="playground">
+    <div class="section-label">04 — AI Playground</div>
+    <h2 class="section-title reveal">Live AI <em>demos</em><br>running in your browser</h2>
+    <p class="playground-intro reveal" style="transition-delay:.05s">
+      These demos run <strong>entirely client-side</strong> using MediaPipe and TensorFlow.js —
+      no data leaves your device. They showcase real AI capabilities embedded directly into the portfolio.
+    </p>
+
+    <div class="playground-grid">
+
+      <!-- ─ HAND TRACKING ─────────────────────────────────────────── -->
+      <div class="demo-panel reveal">
+        <div class="demo-panel-header">
+          <span class="demo-panel-title">✋ Real-time Hand Gesture Tracking</span>
+          <span class="demo-badge badge-mp">MediaPipe</span>
+        </div>
+
+        <div class="webcam-wrapper">
+          <video id="handVideo" playsinline></video>
+          <canvas id="handCanvas"></canvas>
+          <div class="cam-placeholder" id="camPlaceholder">
+            <span class="cam-icon">📷</span>
+            <span>Click Start Camera to begin</span>
+            <span style="font-size:0.58rem;color:var(--border)">Webcam access required</span>
+          </div>
+        </div>
+
+        <div class="gesture-display" id="gestureDisplay">
+          <div class="gesture-emoji" id="gestureEmoji">—</div>
+          <div class="gesture-info">
+            <div class="gesture-name" id="gestureName">Waiting for camera…</div>
+            <div class="gesture-desc" id="gestureDesc">Start the camera to detect gestures</div>
+          </div>
+          <div class="hand-count" id="handCount">0</div>
+        </div>
+
+        <div class="landmark-stats" id="fingerStats">
+          <div class="finger-stat" id="fThumb"><div class="f-label">Thumb</div><div class="f-dot"></div></div>
+          <div class="finger-stat" id="fIndex"><div class="f-label">Index</div><div class="f-dot"></div></div>
+          <div class="finger-stat" id="fMiddle"><div class="f-label">Middle</div><div class="f-dot"></div></div>
+          <div class="finger-stat" id="fRing"><div class="f-label">Ring</div><div class="f-dot"></div></div>
+          <div class="finger-stat" id="fPinky"><div class="f-label">Pinky</div><div class="f-dot"></div></div>
+        </div>
+
+        <button class="hand-btn start" id="handBtn" onclick="toggleCamera()">
+          ▶ Start Camera
+        </button>
+      </div>
+
+      <!-- ─ IMAGE CLASSIFIER ──────────────────────────────────────── -->
+      <div class="demo-panel reveal" style="transition-delay:.1s">
+        <div class="demo-panel-header">
+          <span class="demo-panel-title">🔍 MobileNet Image Classification</span>
+          <span class="demo-badge badge-tf">TF.js</span>
+        </div>
+
+        <div class="tf-status">
+          <div class="tf-dot loading" id="tfDot"></div>
+          <span id="tfStatus">Loading MobileNet model…</span>
+        </div>
+
+        <div class="drop-zone" id="dropZone"
+          onclick="document.getElementById('classifyInput').click()"
+          ondragover="handleDragOver(event)"
+          ondragleave="handleDragLeave(event)"
+          ondrop="handleDrop(event)">
+          <img id="previewImg" class="preview-img" alt="preview"/>
+          <span class="drop-icon" id="dropIcon">🖼️</span>
+          <span class="drop-label" id="dropLabel">Drop an image here</span>
+          <span class="drop-sub">or click to upload · JPG, PNG, WebP</span>
+        </div>
+        <input type="file" id="classifyInput" accept="image/*" onchange="handleFileSelect(event)">
+
+        <div class="predictions-list" id="predictionsList">
+          <div class="pred-placeholder">Upload an image to see top-3 predictions with confidence scores</div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- CONTACT ──────────────────────────────────────────────────────── -->
+  <section id="contact">
+    <div class="section-label">05 — Contact</div>
+    <div class="contact-inner">
+      <div class="reveal">
+        <h2 class="section-title">Let's build<br>something <em>real</em></h2>
+        <p style="font-size:.85rem;color:var(--muted);line-height:1.8;margin-top:1.2rem;max-width:400px;">
+          I'm actively looking for <strong style="color:var(--text)">AI/ML, Data Science, and Backend Engineering internships</strong>
+          and full-time roles. If you're working on something interesting, I'd love to chat.
+        </p>
+        <div style="margin-top:2rem;padding:1rem 1.5rem;border:1px solid rgba(0,229,160,0.2);background:rgba(0,229,160,0.04);">
+          <div class="status-dot"><span class="dot"></span> Open to opportunities — immediate start available</div>
+        </div>
+      </div>
+      <div class="contact-links reveal" style="transition-delay:.1s">
+        <a href="mailto:hemantxuppal@gmail.com" class="contact-item"><span class="contact-label">Email</span><span>hemantxuppal@gmail.com</span></a>
+        <a href="https://github.com/THemanT3" target="_blank" class="contact-item"><span class="contact-label">GitHub</span><span>github.com/THemanT3</span></a>
+        <a href="https://www.linkedin.com/in/hemant-u-a12662272/" target="_blank" class="contact-item"><span class="contact-label">LinkedIn</span><span>Connect on LinkedIn</span></a>
+        <a href="https://biznusion.github.io" target="_blank" class="contact-item"><span class="contact-label">Project</span><span>Biznusion Business App</span></a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p>© 2025 Hemant Uppal · Delhi, India</p>
+    <p style="color:var(--muted)">B.Sc. DU · B.S. IIT Madras</p>
+    <div class="status-dot"><span class="dot"></span> Available for hire</div>
+  </footer>
+
+  <!-- CHATBOT WIDGET ───────────────────────────────────────────────── -->
+  <button class="chat-toggle" id="chatToggle" onclick="toggleChat()" aria-label="Open chat">
+    <span class="chat-badge"></span>
+    <!-- open icon -->
+    <svg class="icon-open" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+    </svg>
+    <!-- close icon -->
+    <svg class="icon-close" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18"></line>
+      <line x1="6" y1="6" x2="18" y2="18"></line>
+    </svg>
+  </button>
+
+  <div class="chat-panel" id="chatPanel">
+    <div class="chat-header">
+      <div class="chat-avatar">AI</div>
+      <div class="chat-header-info">
+        <div class="chat-header-name">Hemant's Portfolio Assistant</div>
+        <div class="chat-header-status">Online · Powered by Claude</div>
+      </div>
+    </div>
+
+    <div class="chat-api-url">
+      <span class="chat-api-label">API URL</span>
+      <input class="chat-api-input" id="apiUrlInput" type="text"
+        value="http://localhost:8000" placeholder="http://localhost:8000" />
+    </div>
+
+    <div class="chat-messages" id="chatMessages">
+      <!-- initial greeting injected by JS -->
+    </div>
+
+    <div class="chat-error" id="chatError"></div>
+
+    <div class="chat-input-area">
+      <textarea class="chat-input" id="chatInput" rows="1"
+        placeholder="Ask about Hemant's projects, skills…"
+        onkeydown="handleChatKey(event)"></textarea>
+      <button class="chat-send" id="chatSend" onclick="sendMessage()">Send</button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <script>
+  /* ── CURSOR ──────────────────────────────────────────────────────── */
+  const cursor = document.getElementById('cursor');
+  const ring   = document.getElementById('cursorRing');
+  let mx=0, my=0, rx=0, ry=0;
+  document.addEventListener('mousemove', e => { mx=e.clientX; my=e.clientY; });
+  (function animCursor(){
+    cursor.style.left=(mx-6)+'px'; cursor.style.top=(my-6)+'px';
+    rx+=(mx-rx)*0.12; ry+=(my-ry)*0.12;
+    ring.style.left=(rx-18)+'px'; ring.style.top=(ry-18)+'px';
+    requestAnimationFrame(animCursor);
+  })();
+  document.querySelectorAll('a,button,[onclick]').forEach(el=>{
+    el.addEventListener('mouseenter',()=>{ cursor.style.transform='scale(2.5)'; ring.style.transform='scale(1.5)'; });
+    el.addEventListener('mouseleave',()=>{ cursor.style.transform='scale(1)'; ring.style.transform='scale(1)'; });
+  });
+
+  /* ── NAV SCROLL ──────────────────────────────────────────────────── */
+  window.addEventListener('scroll', ()=>
+    document.getElementById('nav').classList.toggle('scrolled', scrollY>50));
+
+  /* ── REVEAL ON SCROLL ────────────────────────────────────────────── */
+  const obs = new IntersectionObserver(entries =>
+    entries.forEach(e=>{ if(e.isIntersecting) e.target.classList.add('visible'); }), {threshold:0.1});
+  document.querySelectorAll('.reveal').forEach(el=>obs.observe(el));
+  setTimeout(()=>document.querySelectorAll('#hero .reveal').forEach(el=>el.classList.add('visible')), 100);
+
+  /* ══════════════════════════════════════════════════════════════════
+     MEDIAPIPE HAND TRACKING
+  ══════════════════════════════════════════════════════════════════ */
+  let handCamera = null;
+  let cameraRunning = false;
+  const handVideo  = document.getElementById('handVideo');
+  const handCanvas = document.getElementById('handCanvas');
+  const ctx        = handCanvas.getContext('2d');
+  const placeholder= document.getElementById('camPlaceholder');
+
+  // Finger tip / pip indices (MediaPipe hand landmarks)
+  const TIPS = [4,8,12,16,20];  // thumb,index,middle,ring,pinky
+  const PIPS = [3,6,10,14,18];  // thumb ip, others pip
+
+  const GESTURES = {
+    '00000': ['✊','Fist','All fingers curled'],
+    '01000': ['☝️','Point','Index finger extended'],
+    '01100': ['✌️','Peace','Victory sign'],
+    '01110': ['🤟','Three','Three fingers up'],
+    '01111': ['🖖','Four','Four fingers extended'],
+    '11111': ['🖐️','Open Hand','All five fingers extended'],
+    '10000': ['👍','Thumbs Up','Thumb raised'],
+    '10001': ['🤙','Call Me','Thumb and pinky extended'],
+    '11000': ['🤘','Rock On','Thumb and index out'],
+    '00001': ['🤙','Pinky','Only pinky up'],
+    '00011': ['✌️','Inverted Peace','Ring and pinky'],
+  };
+
+  function getFingerStates(landmarks) {
+    // For thumb: compare tip.x vs ip.x (depends on handedness, use y as fallback)
+    const states = [];
+    // Thumb: tip y vs mcp y
+    states.push(landmarks[TIPS[0]].y < landmarks[2].y ? 1 : 0);
+    // Other fingers: tip y vs pip y
+    for(let i=1;i<5;i++) {
+      states.push(landmarks[TIPS[i]].y < landmarks[PIPS[i]].y ? 1 : 0);
+    }
+    return states;
+  }
+
+  function updateFingerUI(states) {
+    const ids=['fThumb','fIndex','fMiddle','fRing','fPinky'];
+    ids.forEach((id,i)=>{
+      document.getElementById(id).classList.toggle('active', states[i]===1);
+    });
+  }
+
+  function onHandResults(results) {
+    handCanvas.width  = handVideo.videoWidth  || 640;
+    handCanvas.height = handVideo.videoHeight || 480;
+    ctx.save();
+    ctx.clearRect(0,0,handCanvas.width,handCanvas.height);
+    ctx.drawImage(results.image,0,0,handCanvas.width,handCanvas.height);
+
+    const count = results.multiHandLandmarks ? results.multiHandLandmarks.length : 0;
+    document.getElementById('handCount').textContent = count;
+
+    if(results.multiHandLandmarks && count > 0) {
+      for(const landmarks of results.multiHandLandmarks) {
+        // Draw connections
+        drawConnectors(ctx, landmarks, HAND_CONNECTIONS,
+          {color:'rgba(0,229,160,0.7)', lineWidth:2});
+        // Draw landmarks
+        drawLandmarks(ctx, landmarks,
+          {color:'rgba(123,97,255,0.9)', lineWidth:1,
+           fillColor:'rgba(0,229,160,0.5)', radius:4});
+      }
+
+      // Gesture from first hand
+      const states = getFingerStates(results.multiHandLandmarks[0]);
+      updateFingerUI(states);
+      const key = states.join('');
+      const g = GESTURES[key] || ['🤚','Custom Pose','Unknown gesture'];
+      document.getElementById('gestureEmoji').textContent = g[0];
+      document.getElementById('gestureName').textContent  = g[1];
+      document.getElementById('gestureDesc').textContent  = g[2];
+    } else {
+      updateFingerUI([0,0,0,0,0]);
+      document.getElementById('gestureEmoji').textContent = '—';
+      document.getElementById('gestureName').textContent  = 'No hand detected';
+      document.getElementById('gestureDesc').textContent  = 'Show your hand to the camera';
+    }
+    ctx.restore();
+  }
+
+  async function toggleCamera() {
+    const btn = document.getElementById('handBtn');
+    if(cameraRunning) {
+      // Stop
+      if(handCamera) { handCamera.stop(); handCamera=null; }
+      cameraRunning = false;
+      btn.textContent = '▶ Start Camera';
+      btn.className   = 'hand-btn start';
+      placeholder.classList.remove('hidden');
+      ctx.clearRect(0,0,handCanvas.width,handCanvas.height);
+      document.getElementById('gestureEmoji').textContent = '—';
+      document.getElementById('gestureName').textContent  = 'Waiting for camera…';
+      document.getElementById('gestureDesc').textContent  = 'Start the camera to detect gestures';
+      document.getElementById('handCount').textContent    = '0';
+      updateFingerUI([0,0,0,0,0]);
+      return;
+    }
+
+    btn.textContent = '⏳ Starting…';
+    btn.disabled    = true;
+
+    try {
+      const hands = new Hands({
+        locateFile: f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
+      });
+      hands.setOptions({
+        maxNumHands: 2,
+        modelComplexity: 1,
+        minDetectionConfidence: 0.6,
+        minTrackingConfidence: 0.5
+      });
+      hands.onResults(onHandResults);
+
+      handCamera = new Camera(handVideo, {
+        onFrame: async ()=>{ await hands.send({image:handVideo}); },
+        width:640, height:480
+      });
+      await handCamera.start();
+
+      cameraRunning = true;
+      placeholder.classList.add('hidden');
+      btn.textContent = '⏹ Stop Camera';
+      btn.className   = 'hand-btn stop';
+      btn.disabled    = false;
+      document.getElementById('gestureName').textContent = 'Camera active — show your hand!';
+      document.getElementById('gestureDesc').textContent = 'Gesture detection running…';
+    } catch(err) {
+      btn.textContent = '▶ Start Camera';
+      btn.className   = 'hand-btn start';
+      btn.disabled    = false;
+      document.getElementById('gestureName').textContent = 'Camera error';
+      document.getElementById('gestureDesc').textContent = err.message || 'Could not access webcam';
+    }
+  }
+
+  /* ══════════════════════════════════════════════════════════════════
+     TENSORFLOW.JS MOBILENET IMAGE CLASSIFIER
+  ══════════════════════════════════════════════════════════════════ */
+  let mnModel = null;
+  const tfDot    = document.getElementById('tfDot');
+  const tfStatus = document.getElementById('tfStatus');
+
+  async function loadMobileNet() {
+    try {
+      tfStatus.textContent = 'Loading MobileNet model…';
+      mnModel = await mobilenet.load({ version:2, alpha:1.0 });
+      tfDot.className    = 'tf-dot ready';
+      tfStatus.textContent = 'MobileNet ready — upload any image';
+    } catch(e) {
+      tfDot.className    = 'tf-dot';
+      tfStatus.textContent = 'Failed to load model: '+e.message;
+    }
+  }
+  loadMobileNet();
+
+  function handleDragOver(e) {
+    e.preventDefault();
+    document.getElementById('dropZone').classList.add('drag-over');
+  }
+  function handleDragLeave(e) {
+    document.getElementById('dropZone').classList.remove('drag-over');
+  }
+  function handleDrop(e) {
+    e.preventDefault();
+    document.getElementById('dropZone').classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if(file && file.type.startsWith('image/')) classifyImage(file);
+  }
+  function handleFileSelect(e) {
+    const file = e.target.files[0];
+    if(file) classifyImage(file);
+  }
+
+  async function classifyImage(file) {
+    if(!mnModel) {
+      document.getElementById('predictionsList').innerHTML =
+        '<div class="pred-placeholder">Model is still loading, please wait…</div>';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = async ev => {
+      const img = document.getElementById('previewImg');
+      img.src = ev.target.result;
+      img.style.display = 'block';
+      document.getElementById('dropIcon').style.display    = 'none';
+      document.getElementById('dropLabel').style.display   = 'none';
+      document.getElementById('predictionsList').innerHTML =
+        '<div class="pred-placeholder">🔍 Classifying…</div>';
+
+      img.onload = async () => {
+        try {
+          const preds = await mnModel.classify(img, 3);
+          renderPredictions(preds);
+        } catch(err) {
+          document.getElementById('predictionsList').innerHTML =
+            '<div class="pred-placeholder" style="color:var(--accent3)">Classification failed: '+err.message+'</div>';
+        }
+      };
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function renderPredictions(preds) {
+    const list = document.getElementById('predictionsList');
+    list.innerHTML = '';
+    const colors = ['var(--accent)','var(--accent2)','var(--accent3)'];
+    preds.forEach((p,i)=>{
+      const pct  = (p.probability*100).toFixed(1);
+      const item = document.createElement('div');
+      item.className = 'pred-item';
+      item.innerHTML = `
+        <div class="pred-bar" style="width:0%;background:linear-gradient(90deg,rgba(0,229,160,0.08),transparent)"></div>
+        <div class="pred-content">
+          <span class="pred-class">${p.className.replace(/,.*$/,'')}</span>
+          <span class="pred-conf" style="color:${colors[i]}">${pct}%</span>
+        </div>`;
+      list.appendChild(item);
+      // Animate bar
+      requestAnimationFrame(()=>{
+        item.querySelector('.pred-bar').style.width = pct+'%';
+      });
+    });
+  }
+
+  /* ══════════════════════════════════════════════════════════════════
+     AI CHATBOT
+  ══════════════════════════════════════════════════════════════════ */
+  let chatOpen    = false;
+  let chatHistory = [];   // [{role, content}, ...]
+  let chatBusy    = false;
+
+  function toggleChat() {
+    chatOpen = !chatOpen;
+    document.getElementById('chatPanel').classList.toggle('open', chatOpen);
+    document.getElementById('chatToggle').classList.toggle('open', chatOpen);
+    if(chatOpen && chatHistory.length===0) injectGreeting();
+    if(chatOpen) setTimeout(()=>document.getElementById('chatInput').focus(), 320);
+  }
+
+  function injectGreeting() {
+    appendMsg('bot',
+      "👋 Hi! I'm Hemant's AI portfolio assistant — powered by Claude.\n\n" +
+      "Ask me anything about his projects, skills, background, or availability. What would you like to know?",
+      false);
+  }
+
+  function appendMsg(role, text, addToHistory=true) {
+    const wrap = document.getElementById('chatMessages');
+    const div  = document.createElement('div');
+    div.className = 'msg '+role;
+    const now = new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+    div.innerHTML = `
+      <div class="msg-bubble">${escHtml(text)}</div>
+      <div class="msg-time">${now}</div>`;
+    wrap.appendChild(div);
+    wrap.scrollTop = wrap.scrollHeight;
+    if(addToHistory) chatHistory.push({role, content:text});
+  }
+
+  function showTyping() {
+    const wrap = document.getElementById('chatMessages');
+    const div  = document.createElement('div');
+    div.className='msg bot'; div.id='typingIndicator';
+    div.innerHTML=`<div class="typing-bubble">
+      <div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>
+    </div>`;
+    wrap.appendChild(div);
+    wrap.scrollTop = wrap.scrollHeight;
+  }
+
+  function hideTyping() {
+    const t = document.getElementById('typingIndicator');
+    if(t) t.remove();
+  }
+
+  function setError(msg) {
+    const el = document.getElementById('chatError');
+    if(msg) { el.textContent=msg; el.classList.add('visible'); }
+    else     { el.classList.remove('visible'); }
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;')
+            .replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+  }
+
+  async function sendMessage() {
+    if(chatBusy) return;
+    const input = document.getElementById('chatInput');
+    const msg   = input.value.trim();
+    if(!msg) return;
+
+    input.value = '';
+    input.style.height = 'auto';
+    setError('');
+    appendMsg('user', msg);
+
+    const apiBase = document.getElementById('apiUrlInput').value.trim().replace(/\/$/,'');
+    chatBusy = true;
+    document.getElementById('chatSend').disabled = true;
+    showTyping();
+
+    try {
+      // Build history excluding the message we just appended (last entry)
+      const history = chatHistory.slice(0,-1).map(m=>({role:m.role, content:m.content}));
+
+      const res = await fetch(`${apiBase}/api/chat`, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ message:msg, history })
+      });
+
+      if(!res.ok) {
+        const err = await res.json().catch(()=>({detail:'Server error '+res.status}));
+        throw new Error(err.detail || 'Server error '+res.status);
+      }
+      const data = await res.json();
+      hideTyping();
+      appendMsg('bot', data.reply);
+    } catch(err) {
+      hideTyping();
+      const hint = err.message.includes('Failed to fetch')
+        ? 'Cannot reach the backend. Make sure the FastAPI server is running at the URL above.'
+        : err.message;
+      setError('⚠ '+hint);
+      // Remove failed user msg from history so user can retry
+      chatHistory.pop();
+    } finally {
+      chatBusy = false;
+      document.getElementById('chatSend').disabled = false;
+    }
+  }
+
+  function handleChatKey(e) {
+    if(e.key==='Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+    // Auto-grow textarea
+    const ta = e.target;
+    ta.style.height='auto';
+    ta.style.height=Math.min(ta.scrollHeight,120)+'px';
+  }
+  </script>
+
+</body>
+</html>
